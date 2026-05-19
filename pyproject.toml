@@ -1,0 +1,41 @@
+[project]
+name = "gh-stars"
+version = "0.1.0"
+description = "Fetch starred GitHub repos, categorize with Claude, and write to Obsidian vault"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28",
+    "python-dotenv>=1.1",
+    "anthropic>=0.52",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+gh-stars = "src.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "respx>=0.22.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
