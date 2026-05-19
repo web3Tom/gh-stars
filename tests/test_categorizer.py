@@ -2,7 +2,7 @@
 
 from datetime import date
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -87,7 +87,7 @@ async def test_categorize_repos_fallback_on_parse_error(tmp_vault):
     ]
 
     with patch("src.categorizer.anthropic.Anthropic") as mock_anthropic:
-        mock_client = AsyncMock()
+        mock_client = MagicMock()
         mock_anthropic.return_value = mock_client
 
         # Simulate unparseable response
@@ -124,7 +124,7 @@ async def test_categorize_repos_success(tmp_vault):
     ]
 
     with patch("src.categorizer.anthropic.Anthropic") as mock_anthropic:
-        mock_client = AsyncMock()
+        mock_client = MagicMock()
         mock_anthropic.return_value = mock_client
 
         # Mock successful response

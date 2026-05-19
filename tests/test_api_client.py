@@ -13,30 +13,34 @@ async def test_list_starred_repos_pagination():
     """Test pagination through starred repos."""
     client = GitHubClient("ghp_test123")
 
-    # Mock first page
+    # Page 1 returns one item, page 2 returns empty to terminate pagination.
+    rate_headers = {
+        "X-RateLimit-Remaining": "4999",
+        "X-RateLimit-Reset": "9999999999",
+    }
     respx.get("https://api.github.com/user/starred").mock(
-        return_value=Response(
-            200,
-            json=[
-                {
-                    "starred_at": "2026-03-15T10:30:00Z",
-                    "repo": {
-                        "id": 123,
-                        "name": "repo1",
-                        "owner": {"login": "owner1"},
-                        "html_url": "https://github.com/owner1/repo1",
-                        "description": "Repo 1",
-                        "language": "Python",
-                        "stargazers_count": 100,
-                        "topics": ["ai"],
-                    },
-                }
-            ],
-            headers={
-                "X-RateLimit-Remaining": "4999",
-                "X-RateLimit-Reset": "9999999999",
-            },
-        )
+        side_effect=[
+            Response(
+                200,
+                json=[
+                    {
+                        "starred_at": "2026-03-15T10:30:00Z",
+                        "repo": {
+                            "id": 123,
+                            "name": "repo1",
+                            "owner": {"login": "owner1"},
+                            "html_url": "https://github.com/owner1/repo1",
+                            "description": "Repo 1",
+                            "language": "Python",
+                            "stargazers_count": 100,
+                            "topics": ["ai"],
+                        },
+                    }
+                ],
+                headers=rate_headers,
+            ),
+            Response(200, json=[], headers=rate_headers),
+        ]
     )
 
     repos = []
