@@ -3,6 +3,8 @@
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from src.markdown_writer import read_existing_ids, write_repo_note
 from src.models import StarredRepo, CategorizedRepo
 

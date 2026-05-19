@@ -57,10 +57,6 @@ async def _sync_command(
     notes_dir = config.knowledge_base_dir / "09_feeds" / "gh-stars"
     clones_dir = config.clones_dir
 
-    if not config.anthropic_api_key:
-        logger.error("ANTHROPIC_API_KEY not set; skipping categorization")
-        return
-
     # Read existing repo IDs (dedup key)
     existing_ids = read_existing_ids(notes_dir)
     logger.info(f"Found {len(existing_ids)} existing repo IDs")
@@ -87,6 +83,11 @@ async def _sync_command(
             logger.info(f"  {repo.owner}/{repo.name}")
         if len(novel_repos) > 10:
             logger.info(f"  ... and {len(novel_repos) - 10} more")
+        return
+
+    # Categorization requires the Anthropic key; check now that we know we'll call Claude.
+    if not config.anthropic_api_key:
+        logger.error("ANTHROPIC_API_KEY not set; cannot categorize")
         return
 
     # Plan-and-confirm if >100 novel repos

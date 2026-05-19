@@ -5,4 +5,4 @@ repos:
         name: Check for secrets and absolute paths
         entry: bash -c 'git diff --cached -U0 | grep -E "(/home/|/Users/|C:\\Users\\|ghp_[a-zA-Z0-9]|github_pat_[a-zA-Z0-9]|sk-ant-[a-zA-Z0-9])" && exit 1 || exit 0'
         language: system
-        stages: [commit]
+        stages: [pre-commit]
