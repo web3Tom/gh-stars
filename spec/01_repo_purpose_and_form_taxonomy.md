@@ -20,7 +20,7 @@ GitHub repositories are structural and functional artifacts, not just informatio
 
 - Introduce a fully configurable taxonomy override loader.
 - Migrate every historical archive note.
-- Replace `list` frontmatter behavior.
+- Add account-side GitHub List allocation.
 
 # Risks or constraints
 

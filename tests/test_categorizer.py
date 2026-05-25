@@ -13,10 +13,9 @@ from src.models import StarredRepo
 def test_read_existing_taxonomy_empty(tmp_vault):
     """Test read_existing_taxonomy with no files."""
     notes_dir = tmp_vault / "09_feeds" / "gh-stars"
-    categories, lists, tags = read_existing_taxonomy(notes_dir)
+    categories, tags = read_existing_taxonomy(notes_dir)
 
     assert categories == {}
-    assert lists == set()
     assert tags == set()
 
 
@@ -29,18 +28,16 @@ def test_read_existing_taxonomy_with_notes(tmp_vault):
         """---
 category: "AI"
 subCategory: "LLM"
-list: "agent-research"
 tags: ["layer/library", "lang/python"]
 ---
 # Body
 """
     )
 
-    categories, lists, tags = read_existing_taxonomy(notes_dir)
+    categories, tags = read_existing_taxonomy(notes_dir)
 
     assert "AI" in categories
     assert "LLM" in categories["AI"]
-    assert "agent-research" in lists
     assert tags == {"layer/library", "lang/python"}
 
 
@@ -56,21 +53,20 @@ def test_read_existing_taxonomy_ignores_readme_examples(tmp_vault):
 ---
 category: "Example Category"
 subCategory: "exampleSubcategory"
-list: "example-list"
+tags: ["layer/library"]
 ---
 ```
 """
     )
 
-    categories, lists, tags = read_existing_taxonomy(notes_dir)
+    categories, tags = read_existing_taxonomy(notes_dir)
 
     assert categories == {}
-    assert lists == set()
     assert tags == set()
 
 
-def test_read_existing_taxonomy_from_archive(tmp_vault):
-    """Test that archive lists are scanned."""
+def test_read_existing_taxonomy_tags_from_archive(tmp_vault):
+    """Test that archive tags are scanned."""
     notes_dir = tmp_vault / "09_feeds" / "gh-stars"
     archive_dir = notes_dir / "archive"
     archive_dir.mkdir(parents=True)
@@ -80,18 +76,18 @@ def test_read_existing_taxonomy_from_archive(tmp_vault):
         """---
 category: "Archive"
 subCategory: "Old"
-list: "archived-bucket"
+tags: ["layer/markdown"]
 ---
 # Body
 """
     )
 
-    categories, lists, tags = read_existing_taxonomy(notes_dir)
+    categories, tags = read_existing_taxonomy(notes_dir)
 
     # Archive categories NOT in main dict (we only scan active for categories)
-    # But lists ARE scanned from archive
-    assert "archived-bucket" in lists
-    assert tags == set()
+    # But tags ARE scanned from archive
+    assert categories == {}
+    assert tags == {"layer/markdown"}
 
 
 def test_normalize_tags_allows_only_form_prefixes():
@@ -152,7 +148,6 @@ async def test_categorize_repos_fallback_on_parse_error(tmp_vault):
         assert len(result) == 1
         assert result[0].category == "General"
         assert result[0].sub_category == "Uncategorized"
-        assert result[0].list == "unsorted"
         assert result[0].tags == ("layer/library", "lang/python")
 
 
@@ -183,7 +178,7 @@ async def test_categorize_repos_success(tmp_vault):
 
         # Mock successful response
         mock_client.messages.create.return_value.content[0].text = (
-            '[{"repo_id": 1, "category": "Core Frameworks", "subCategory": "Agentic Orchestration", "list": "ai-coding-tools", "tags": ["layer/library", "lang/python", "tool/docker"]}]'
+            '[{"repo_id": 1, "category": "Core Frameworks", "subCategory": "Agentic Orchestration", "tags": ["layer/library", "lang/python", "tool/docker"]}]'
         )
 
         result = await categorize_repos(
@@ -196,7 +191,6 @@ async def test_categorize_repos_success(tmp_vault):
         assert len(result) == 1
         assert result[0].category == "Core Frameworks"
         assert result[0].sub_category == "Agentic Orchestration"
-        assert result[0].list == "ai-coding-tools"
         assert result[0].tags == ("layer/library", "lang/python")
 
         user_payload = mock_client.messages.create.call_args.kwargs["messages"][0]["content"]
@@ -228,7 +222,7 @@ async def test_categorize_repos_trusts_github_language_tag(tmp_vault):
         mock_client = MagicMock()
         mock_anthropic.return_value = mock_client
         mock_client.messages.create.return_value.content[0].text = (
-            '[{"repo_id": 1, "category": "Infrastructure & Data", "subCategory": "Proxies & Gateways", "list": "infrastructure", "tags": ["layer/api", "lang/python"]}]'
+            '[{"repo_id": 1, "category": "Infrastructure & Data", "subCategory": "Proxies & Gateways", "tags": ["layer/api", "lang/python"]}]'
         )
 
         result = await categorize_repos(repos, notes_dir, "sk-test")
@@ -261,7 +255,7 @@ async def test_categorize_repos_accepts_fenced_json(tmp_vault):
         mock_client = MagicMock()
         mock_anthropic.return_value = mock_client
         mock_client.messages.create.return_value.content[0].text = """```json
-[{"repo_id": 1, "category": "Core Frameworks", "subCategory": "Agentic Orchestration", "list": "ai-coding-tools", "tags": ["lang/python"]}]
+[{"repo_id": 1, "category": "Core Frameworks", "subCategory": "Agentic Orchestration", "tags": ["lang/python"]}]
 ```"""
 
         result = await categorize_repos(repos, notes_dir, "sk-test")
@@ -269,5 +263,4 @@ async def test_categorize_repos_accepts_fenced_json(tmp_vault):
         assert len(result) == 1
         assert result[0].category == "Core Frameworks"
         assert result[0].sub_category == "Agentic Orchestration"
-        assert result[0].list == "ai-coding-tools"
         assert result[0].tags == ("layer/library", "lang/python")

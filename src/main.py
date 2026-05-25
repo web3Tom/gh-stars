@@ -12,9 +12,8 @@ from uuid import uuid4
 from src.api_client import GitHubClient
 from src.categorizer import categorize_repos
 from src.cloner import reconcile_clones
-from src.config import load_config, resolve_github_lists_token
-from src.github_lists import GitHubListsClient, sync_github_lists
-from src.markdown_writer import read_existing_categorized_notes, read_existing_ids, write_repo_note
+from src.config import load_config
+from src.markdown_writer import read_existing_ids, write_repo_note
 from src.removal import remove_candidates, scan_unstar_notes
 
 logger = logging.getLogger(__name__)
@@ -48,7 +47,6 @@ async def _sync_command(
     max_repos: int | None = None,
     dry_run: bool = False,
     yes: bool = False,
-    sync_lists: bool = False,
     verbose: bool = False,
 ) -> None:
     """Fetch repos, categorize, write notes, reconcile clones."""
@@ -65,9 +63,6 @@ async def _sync_command(
 
     # Fetch starred repos
     client = GitHubClient(config.github_pat)
-    lists_client = (
-        GitHubListsClient(resolve_github_lists_token(config.github_pat)) if sync_lists else None
-    )
     all_repos = []
     async for repo in client.list_starred_repos():
         all_repos.append(repo)
@@ -142,16 +137,6 @@ async def _sync_command(
 
         logger.info(f"Batch {batch_num}/{total_batches}: wrote {len(categorized_list)} notes")
 
-        if lists_client:
-            list_stats = await sync_github_lists(lists_client, categorized_list, readmes)
-            logger.info(
-                f"GitHub Lists batch sync: "
-                f"{list_stats.updated} updated, {list_stats.created_lists} lists created, "
-                f"{list_stats.skipped_missing_node_id} skipped, {list_stats.failed} failed"
-            )
-            for warning in list_stats.warnings:
-                logger.warning(warning)
-
     # Reconcile clones
     logger.info("Reconciling clones...")
     clone_stats = await reconcile_clones(notes_dir, clones_dir)
@@ -173,7 +158,7 @@ async def _sync_command(
             "skipped_existing": len(existing_ids),
             "novel": len(novel_repos),
         },
-        "output": {"files_written": files_written, "github_lists_synced": sync_lists},
+        "output": {"files_written": files_written},
     }
     notes_dir.mkdir(parents=True, exist_ok=True)
     with open(history_path, "a") as f:
@@ -235,71 +220,6 @@ async def _remove_unstarred_command(
         f.write(json.dumps(run_record) + "\n")
 
 
-async def _sync_existing_github_lists_command(
-    config_path: Path | None = None,
-    max_repos: int | None = None,
-    verbose: bool = False,
-) -> None:
-    """Backfill GitHub User Lists from active gh-stars notes."""
-    _setup_logging(verbose)
-    logger.info("Starting GitHub Lists backfill...")
-
-    config = load_config(config_path)
-    notes_dir = config.knowledge_base_dir / "09_feeds" / "gh-stars"
-
-    github_client = GitHubClient(config.github_pat)
-    starred_repos_by_id = {}
-    async for repo in github_client.list_starred_repos():
-        starred_repos_by_id[repo.repo_id] = repo
-
-    categorized_notes = read_existing_categorized_notes(notes_dir, starred_repos_by_id)
-    missing_node_ids = [item for item in categorized_notes if not item.repo.node_id]
-    syncable_notes = [item for item in categorized_notes if item.repo.node_id]
-
-    if max_repos:
-        syncable_notes = syncable_notes[:max_repos]
-        logger.info(f"Limited to {len(syncable_notes)} repos (--max-repos {max_repos})")
-
-    lists_client = GitHubListsClient(resolve_github_lists_token(config.github_pat))
-    list_stats = await sync_github_lists(lists_client, syncable_notes)
-
-    logger.info(
-        f"GitHub Lists backfill complete: "
-        f"{list_stats.updated} updated, {list_stats.created_lists} lists created, "
-        f"{len(missing_node_ids) + list_stats.skipped_missing_node_id} skipped, "
-        f"{list_stats.failed} failed"
-    )
-    for warning in list_stats.warnings:
-        logger.warning(warning)
-    for categorized in missing_node_ids:
-        logger.warning(
-            f"Skipping {categorized.repo.owner}/{categorized.repo.name}: "
-            "not found in current starred repos or missing node_id"
-        )
-
-    history_path = notes_dir / _HISTORY_FILENAME
-    run_record = {
-        "run_id": str(uuid4()),
-        "status": "completed",
-        "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "output_dir": str(notes_dir),
-        "counters": {
-            "active_notes": len(categorized_notes),
-            "syncable": len(syncable_notes),
-            "missing_node_id": len(missing_node_ids),
-        },
-        "output": {
-            "github_lists_backfilled": True,
-            "updated": list_stats.updated,
-            "created_lists": list_stats.created_lists,
-            "failed": list_stats.failed,
-        },
-    }
-    notes_dir.mkdir(parents=True, exist_ok=True)
-    with open(history_path, "a") as f:
-        f.write(json.dumps(run_record) + "\n")
-
-
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -339,11 +259,6 @@ def main() -> None:
         action="store_true",
         help="Skip confirmation prompt for >100 repos",
     )
-    sync_parser.add_argument(
-        "--sync-github-lists",
-        action="store_true",
-        help="Create/update GitHub-side Lists for processed repos",
-    )
 
     # Removal
     removal_parser = subparsers.add_parser(
@@ -355,16 +270,6 @@ def main() -> None:
     clone_parser = subparsers.add_parser(
         "reconcile-clones",
         help="Reconcile cloned: true with on-disk checkouts",
-    )
-    lists_parser = subparsers.add_parser(
-        "sync-github-lists",
-        help="Backfill GitHub-side Lists from active notes",
-    )
-    lists_parser.add_argument(
-        "--max-repos",
-        type=int,
-        default=None,
-        help="Limit backfill to N active notes",
     )
 
     args = parser.parse_args()
@@ -378,14 +283,6 @@ def main() -> None:
         logger.info(
             f"Clone reconciliation: {stats.cloned} cloned, {stats.skipped_existing} skipped"
         )
-    elif args.command == "sync-github-lists":
-        asyncio.run(
-            _sync_existing_github_lists_command(
-                args.config,
-                getattr(args, "max_repos", None),
-                args.verbose,
-            )
-        )
     else:
         # Default: sync
         asyncio.run(
@@ -394,7 +291,6 @@ def main() -> None:
                 getattr(args, "max_repos", None),
                 getattr(args, "dry_run", False),
                 getattr(args, "yes", False),
-                getattr(args, "sync_github_lists", False),
                 args.verbose,
             )
         )

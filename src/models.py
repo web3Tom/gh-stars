@@ -29,7 +29,6 @@ class CategorizedRepo:
     repo: StarredRepo
     category: str
     sub_category: str
-    list: str
     tags: tuple[str, ...]
 
 
@@ -63,26 +62,5 @@ class CloneStats:
     attempted: int
     cloned: int
     skipped_existing: int
-    failed: int
-    warnings: tuple[str, ...]
-
-@dataclass(frozen=True)
-class GitHubList:
-    """A GitHub User List."""
-
-    id: str
-    name: str
-    slug: str
-    description: str | None
-    is_private: bool
-
-@dataclass(frozen=True)
-class GitHubListSyncStats:
-    """Statistics from GitHub User Lists reconciliation."""
-
-    attempted: int
-    updated: int
-    created_lists: int
-    skipped_missing_node_id: int
     failed: int
     warnings: tuple[str, ...]

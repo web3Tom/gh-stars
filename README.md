@@ -10,8 +10,6 @@ GitHub: [`github.com/web3Tom/gh-stars`](https://github.com/web3Tom/gh-stars)
 - **Categorize** each repo using Claude (Sonnet 4.6)
 - **Write Obsidian notes** with frontmatter, README content, and metadata
 - **Enforce purpose/form taxonomy** with category/subCategory for purpose and tags for form
-- **Manage lists** using a frontmatter `list` field to organize by project focus
-- **Sync GitHub Lists** with opt-in GraphQL creation and assignment
 - **Clone support** with `cloned: true` to shallow-clone repos for deeper analysis
 - **Unstar workflow** with `unstar: true` to remove repos + move notes to archive
 - **Rate-limit aware** with automatic backoff
@@ -52,14 +50,6 @@ This will:
 - Reconcile shallow clones for repos marked `cloned: true`
 - Append history record
 
-To also create and populate GitHub-side Lists for the repos processed in a run:
-
-```bash
-uv run gh-stars sync --sync-github-lists
-```
-
-This is opt-in because it mutates your GitHub account. The list token must allow GitHub User List GraphQL operations. Resolution order is `GITHUB_LISTS_TOKEN`, then `gh auth token --hostname github.com`, then `GITHUB_PAT_TOKEN`. For `gh` OAuth tokens, refresh with `gh auth refresh -h github.com -s user`.
-
 ### 3. Manage stars
 
 Edit frontmatter to control behavior:
@@ -69,7 +59,6 @@ Edit frontmatter to control behavior:
 unstar: true        # Mark for removal
 cloned: false       # Toggle to true to clone on next sync
 category: "AI"
-list: "agent-research"
 ---
 ```
 
@@ -89,9 +78,6 @@ This moves notes to `archive/`, unstar repos via API, and records history.
 | `uv run gh-stars sync --max-repos 5` | Limit to N repos (testing) |
 | `uv run gh-stars sync --dry-run` | Fetch only, don't write |
 | `uv run gh-stars sync --yes` | Skip >100 confirmation |
-| `uv run gh-stars sync --sync-github-lists` | Also create/update GitHub-side Lists |
-| `uv run gh-stars sync-github-lists` | Backfill GitHub-side Lists from active notes |
-| `uv run gh-stars sync-github-lists --max-repos 25` | Backfill a limited note batch |
 | `uv run gh-stars remove-unstarred` | Unstar repos with `unstar: true` |
 | `uv run gh-stars reconcile-clones` | Clone reconciliation only |
 
@@ -105,7 +91,6 @@ repo_id: 884521234                   # GitHub numeric ID (dedup key)
 description: "..."                   # From GitHub
 category: "Knowledge & Reference"    # Purpose domain
 subCategory: "Curated Lists"         # Purpose discipline
-list: "agent-research"               # Project bucket (lowercase-kebab-case)
 tags: ["layer/library", "lang/python"] # Form facets
 language: "Python"                   # From GitHub
 stars: 4521                          # Current count
@@ -116,29 +101,8 @@ unstar: false                        # Set true to trigger unstar
 ---
 ```
 
-## GitHub Lists
-
-`--sync-github-lists` uses GitHub GraphQL to create missing User Lists and add each newly processed repo to one selected List. Existing List memberships are preserved before calling `updateUserListsForItem`.
-
-Existing active notes can be backfilled without re-categorizing:
-
-```bash
-uv run gh-stars sync-github-lists
-```
-
-For staged review, use `--max-repos N`. Backfill fetches your current starred repos to hydrate missing GraphQL node IDs, reads local active note frontmatter for category/list/tag metadata, and does not rewrite notes or call Claude.
-
-List selection is deterministic:
-
-- `Awesome Lists`: repos that look like awesome/curated markdown lists
-- `Agent Skills`: repos that package agent, Claude, Codex, or MCP skills
-- `Learning & Cookbooks`: tutorials, courses, examples, and cookbook repos
-- Purpose fallback: `Core Frameworks`, `Developer Tooling`, `Infrastructure & Data`, `Applied Systems`, or `Knowledge & Reference`
-- `Unsorted`: fallback when the category is outside the known taxonomy
-
 ## Known Limitations
 
-- GitHub Lists backfill skips active notes that are no longer in the current starred repo set
 - No cron/scheduling in v1 (manual runs only)
 - Clones are shallow (`--depth=1`) for speed
 - README truncated at ~20KB to keep Claude calls affordable
@@ -168,7 +132,6 @@ Entity relationship tags such as `model/`, `provider/`, `tool/`, `framework/`, a
 
 ```
 GITHUB_PAT_TOKEN           # Required: PAT or token with star/read access
-GITHUB_LISTS_TOKEN         # Optional: token with User Lists GraphQL access
 ANTHROPIC_API_KEY          # Required for categorization (optional for remove-unstarred)
 KNOWLEDGE_BASE_DIR         # Default: ~/gh-stars-data
 CLONES_DIR                 # Default: <workspace>/clones/

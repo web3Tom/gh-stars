@@ -27,15 +27,13 @@ Primary goals:
 - CLI entrypoint runs end-to-end: `uv run gh-stars sync --dry-run` correctly loads config, authenticates to GitHub, paginates `/user/starred`, and surfaces auth errors as `UnstarScopeError` with a clear message.
 - Local default output resolves to `../knowledge/09_feeds/gh-stars` when the project is checked out beside the workspace Obsidian vault and `KNOWLEDGE_BASE_DIR` is unset.
 - Frontmatter contract enforced and verified: `markdown_writer.py` scans BOTH `output_dir/*.md` and `archive/*.md` for `repo_id` dedup (see comment at `src/markdown_writer.py:33` — this is a non-negotiable invariant for the re-starring-an-archived-repo edge case).
-- `uv run gh-stars sync --sync-github-lists` opt-in creates missing GitHub User Lists and assigns newly processed repos via GraphQL while preserving existing list memberships.
-- `uv run gh-stars sync-github-lists` backfills GitHub User Lists from active notes without calling Claude or rewriting notes.
 
 ### Known issues (backlog — NOT blocking)
 1. **Test coverage at 69.79%, below spec's 80% target.** `main.py` orchestration paths sit at 24% coverage; the leaf modules (markdown_writer 95%, categorizer 86%, removal/cloner/config all ~75%) are well-covered. `pytest --cov` exits non-zero solely due to the `fail_under = 80` gate in `pyproject.toml`. Closing the gap requires ~6–10 additional tests over the `_sync_command` / `_remove_unstarred_command` / `_reconcile_clones_command` async flows.
 2. **`pass` subprocess hangs 10s for ANTHROPIC_API_KEY auto-resolve.** The `_resolve_anthropic_key_from_pass` helper in `src/config.py` spawns `pass ai/anthropic/api-key` via `subprocess.run`, which blocks waiting for GPG-agent unlock that doesn't propagate to non-interactive contexts. Workaround documented for users: `export ANTHROPIC_API_KEY=...` directly in `.envrc.local` rather than relying on the pass fallback. Real fix: drop the pass fallback OR shorten the subprocess timeout to ~1s.
 
 ### Where to pick up next
-1. **First real categorization run** — `uv run gh-stars sync --max-repos 10`. Watch for: `pass` subprocess hang on Anthropic key resolution (issue #2); category/list output quality on first batch; correct frontmatter emission; `.gh-stars-history.jsonl` written to `09_feeds/gh-stars/`.
+1. **First real categorization run** — `uv run gh-stars sync --max-repos 10`. Watch for: `pass` subprocess hang on Anthropic key resolution (issue #2); category/tag output quality on first batch; correct frontmatter emission; `.gh-stars-history.jsonl` written to `09_feeds/gh-stars/`.
 2. **Close coverage gap (#1)** by adding `_sync_command` integration tests against a respx-mocked GitHub + a MagicMock-patched Anthropic.
 
 ### Commit log
@@ -71,7 +69,6 @@ When available in this environment:
 - Treat `.env.example` as the only publishable env file.
 - **Secret Management:** Use `direnv` with `.envrc.local` for local development. This allows fetching secrets from secure storage like `pass` without hardcoding them in the repository.
   - Example `.envrc.local`: `export GITHUB_PAT_TOKEN=$(pass dev/github/pat-agent)`
-- GitHub Lists sync requires User Lists GraphQL access. Resolution order is `GITHUB_LISTS_TOKEN`, then `gh auth token --hostname github.com`, then `GITHUB_PAT_TOKEN`. For `gh` OAuth tokens, refresh with `gh auth refresh -h github.com -s user`; for environment tokens, verify they can call `createUserList` and `updateUserListsForItem`.
 - Before finishing, review `git diff --staged` or `git status` for accidental local-only changes.
 - Keep default paths portable; avoid author-specific home-directory assumptions in public docs or code unless clearly justified.
 
@@ -96,7 +93,6 @@ repo_id: 123456789
 description: "..."
 category: "Category Name"
 subCategory: "Purpose Discipline"
-list: "lowercase-kebab-case"
 tags: ["layer/library", "lang/python"]
 language: "Python"
 stars: 1234
@@ -112,12 +108,9 @@ unstar: false
 - All strings **double-quoted**.
 - `repo_id` is the numeric GitHub repo ID (dedup key across active + archive).
 - `subCategory` uses the Title Case purpose taxonomy, for example `Agentic Orchestration` or `Workspaces & IDEs`.
-- `list` is lowercase-kebab-case from a base set in `config.py:DEFAULT_LIST_BUCKETS`, with Claude allowed to extend.
 - `tags` is required and must use only form facets: `layer/*` and optional `lang/*`.
 - `category`/`subCategory` describe Purpose; `tags` describe Form. Do not use numeric category prefixes such as `01`.
 - Do not use entity relationship tag prefixes such as `model/`, `provider/`, `tool/`, `framework/`, or `concept/`.
-- GitHub-side List assignment is deterministic in `src/github_lists.py`, not copied blindly from frontmatter `list`.
-- Existing active notes can be parsed with `read_existing_categorized_notes()` for GitHub Lists backfill; archive notes are intentionally ignored.
 - `cloned: true` triggers shallow clone on next sync; `false` does nothing.
 - `unstar: true` triggers unstar + archive on `remove-unstarred`; `false` does nothing.
 

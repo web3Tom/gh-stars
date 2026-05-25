@@ -7,7 +7,6 @@ from pathlib import Path
 
 import anthropic
 
-from src.config import DEFAULT_LIST_BUCKETS
 from src.models import CategorizedRepo, StarredRepo
 
 logger = logging.getLogger(__name__)
@@ -47,7 +46,6 @@ _TAG_REFERENCE: dict[str, tuple[str, ...]] = {
 
 _FRONTMATTER_CATEGORY_RE = re.compile(r'^category:\s*"(.+)"', re.MULTILINE)
 _FRONTMATTER_SUBCATEGORY_RE = re.compile(r'^subCategory:\s*"(.+)"', re.MULTILINE)
-_FRONTMATTER_LIST_RE = re.compile(r'^list:\s*"(.+)"', re.MULTILINE)
 _FRONTMATTER_TAGS_RE = re.compile(r"^tags:\s*\[(.*)\]", re.MULTILINE)
 _FENCED_JSON_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNORECASE)
 
@@ -133,46 +131,39 @@ def _parse_frontmatter_tags(frontmatter: str) -> set[str]:
     return set(normalize_tags(raw_values))
 
 
-def read_existing_taxonomy(output_dir: Path) -> tuple[dict[str, set[str]], set[str], set[str]]:
-    """Scan *.md frontmatter for existing category/subCategory, list, and tag values.
+def read_existing_taxonomy(output_dir: Path) -> tuple[dict[str, set[str]], set[str]]:
+    """Scan *.md frontmatter for existing category/subCategory and tag values.
 
     Returns:
-        (categories_dict, list_set, tag_set) where categories_dict maps category -> {subcategories}.
+        (categories_dict, tag_set) where categories_dict maps category -> {subcategories}.
     """
     categories: dict[str, set[str]] = {}
-    lists: set[str] = set()
     tags: set[str] = set()
 
     if not output_dir.exists():
-        return categories, lists, tags
+        return categories, tags
 
     # Scan active notes
     for md_file in output_dir.glob("*.md"):
         frontmatter = _extract_frontmatter(md_file.read_text())
         cat_match = _FRONTMATTER_CATEGORY_RE.search(frontmatter)
         sub_match = _FRONTMATTER_SUBCATEGORY_RE.search(frontmatter)
-        list_match = _FRONTMATTER_LIST_RE.search(frontmatter)
 
         if cat_match and sub_match:
             cat = cat_match.group(1)
             sub = sub_match.group(1)
             categories.setdefault(cat, set()).add(sub)
 
-        if list_match:
-            lists.add(list_match.group(1))
         tags.update(_parse_frontmatter_tags(frontmatter))
 
-    # Scan archive too (for vocabulary, not enforcement)
+    # Scan archive too (for tag vocabulary, not category enforcement)
     archive = output_dir / "archive"
     if archive.exists():
         for md_file in archive.glob("*.md"):
             frontmatter = _extract_frontmatter(md_file.read_text())
-            list_match = _FRONTMATTER_LIST_RE.search(frontmatter)
-            if list_match:
-                lists.add(list_match.group(1))
             tags.update(_parse_frontmatter_tags(frontmatter))
 
-    return categories, lists, tags
+    return categories, tags
 
 
 def _build_taxonomy_block(categories: dict[str, set[str]]) -> str:
@@ -194,12 +185,6 @@ def _build_purpose_taxonomy_block() -> str:
     return "\n".join(lines)
 
 
-def _build_list_block(lists: set[str], default_buckets: tuple[str, ...]) -> str:
-    """Format existing and default lists for the prompt."""
-    all_lists = set(default_buckets) | lists
-    return ", ".join(sorted(all_lists))
-
-
 def _build_tag_reference_block(existing_tags: set[str]) -> str:
     lines: list[str] = []
     for prefix, values in _TAG_REFERENCE.items():
@@ -210,9 +195,7 @@ def _build_tag_reference_block(existing_tags: set[str]) -> str:
 
 def _build_system_prompt(
     categories: dict[str, set[str]],
-    lists: set[str],
     tags: set[str],
-    default_buckets: tuple[str, ...],
 ) -> str:
     """Build the categorization system prompt."""
     existing_taxonomy = ""
@@ -222,16 +205,9 @@ def _build_system_prompt(
             f"{_build_taxonomy_block(categories)}\n"
         )
 
-    lists_section = (
-        f"Project lists (preferred values, may extend):\n{_build_list_block(lists, default_buckets)}\n\n"
-        "Rules:\n"
-        "- Assign each repo to exactly one list.\n"
-        "- Prefer values above, but create a new lowercase-kebab-case list if none fit.\n"
-    )
-
     return (
         "You are a GitHub repository categorizer. Given a JSON array of repos, "
-        "assign each one to category, subCategory, list, and tags.\n\n"
+        "assign each one to category, subCategory, and tags.\n\n"
         "Strict boundary:\n"
         "- category and subCategory describe Purpose: what problem the repository solves.\n"
         "- tags describe Form: how the repository is packaged, consumed, and implemented.\n"
@@ -243,7 +219,6 @@ def _build_system_prompt(
         "- Pick exactly one category and one subCategory per repo.\n"
         "- Prefer the Purpose taxonomy above over inventing new categories.\n"
         "- Do NOT use \"General\" or \"Uncategorized\".\n\n"
-        f"{lists_section}\n\n"
         "Tag taxonomy for Form facets only:\n"
         f"{_build_tag_reference_block(tags)}\n\n"
         "Tag rules:\n"
@@ -253,7 +228,7 @@ def _build_system_prompt(
         "- Do not emit entity relationship tags such as model/, provider/, tool/, framework/, or concept/.\n"
         "- Tags should describe package form and consumption surface, not duplicate the purpose category.\n\n"
         "Response format (ONLY JSON, no other text):\n"
-        '[{"repo_id": 123, "category": "Core Frameworks", "subCategory": "Agentic Orchestration", "list": "agent-research", "tags": ["layer/library", "lang/python"]}, ...]'
+        '[{"repo_id": 123, "category": "Core Frameworks", "subCategory": "Agentic Orchestration", "tags": ["layer/library", "lang/python"]}, ...]'
     )
 
 
@@ -317,8 +292,8 @@ async def categorize_repos(
     if not repos:
         return []
 
-    categories, lists, tags = read_existing_taxonomy(output_dir)
-    system_prompt = _build_system_prompt(categories, lists, tags, DEFAULT_LIST_BUCKETS)
+    categories, tags = read_existing_taxonomy(output_dir)
+    system_prompt = _build_system_prompt(categories, tags)
 
     client = anthropic.Anthropic(api_key=api_key)
     payload = _build_payload(repos, readmes)
@@ -353,7 +328,6 @@ async def categorize_repos(
                 repo=repo,
                 category="General",
                 sub_category="Uncategorized",
-                list="unsorted",
                 tags=_fallback_tags(repo),
             )
             for repo in repos
@@ -372,7 +346,6 @@ async def categorize_repos(
                 repo=repo,
                 category=item.get("category", "General"),
                 sub_category=item.get("subCategory", "Uncategorized"),
-                list=item.get("list", "unsorted"),
                 tags=_enforce_repo_language(
                     repo,
                     normalize_tags(item.get("tags"), require_layer=True) or _fallback_tags(repo),
