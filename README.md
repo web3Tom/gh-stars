@@ -81,6 +81,22 @@ This moves notes to `archive/`, unstar repos via API, and records history.
 | `uv run gh-stars remove-unstarred` | Unstar repos with `unstar: true` |
 | `uv run gh-stars reconcile-clones` | Clone reconciliation only |
 
+## Helper Scripts
+
+Inspect the live category/subCategory/tag matrix without calling GitHub or Claude:
+
+```bash
+uv run python scripts/gh_stars_taxonomy_matrix.py
+```
+
+The default output is a fixed-width terminal table that works cleanly in the VS Code terminal. The script defaults to `../knowledge/09_feeds/gh-stars` when run from the workspace checkout. You can pass a feed directory or vault root explicitly:
+
+```bash
+uv run python scripts/gh_stars_taxonomy_matrix.py /path/to/vault
+uv run python scripts/gh_stars_taxonomy_matrix.py --format markdown
+uv run python scripts/gh_stars_taxonomy_matrix.py --format json
+```
+
 ## Frontmatter Schema
 
 ```yaml
