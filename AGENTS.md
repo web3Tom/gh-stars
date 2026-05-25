@@ -17,7 +17,7 @@ Primary goals:
 
 ## Current State (last updated 2026-05-18)
 
-**Scaffold + 2 bug-fix commits shipped. Pipeline is functionally complete and tested at the unit level. The first end-to-end run is blocked on a user-side PAT issue (GitHub returns 401 "Bad credentials" — see below).**
+**Scaffold + bug-fix commits shipped. Pipeline is functionally complete and tested at the unit level. GitHub authentication is now verified locally; current local runs default to the workspace vault when `../knowledge` exists.**
 
 ### What works
 - Repository live on GitHub at `https://github.com/web3Tom/gh-stars`, branch `main` tracking `origin/main`.
@@ -25,29 +25,18 @@ Primary goals:
 - `pre-commit` hook installed and passing on the current tree; auto-migrated from deprecated `stages: [commit]` to `stages: [pre-commit]`.
 - All **34/34 unit tests pass** (`uv run pytest`).
 - CLI entrypoint runs end-to-end: `uv run gh-stars sync --dry-run` correctly loads config, authenticates to GitHub, paginates `/user/starred`, and surfaces auth errors as `UnstarScopeError` with a clear message.
+- Local default output resolves to `../knowledge/09_feeds/gh-stars` when the project is checked out beside the workspace Obsidian vault and `KNOWLEDGE_BASE_DIR` is unset.
 - Frontmatter contract enforced and verified: `markdown_writer.py` scans BOTH `output_dir/*.md` and `archive/*.md` for `repo_id` dedup (see comment at `src/markdown_writer.py:33` — this is a non-negotiable invariant for the re-starring-an-archived-repo edge case).
-
-### Blocked (user-side)
-- **GitHub PAT returns 401 on every endpoint, including `/user`.** Indicates the credential itself is rejected (not a scope issue — scope problems are 403). Most likely root cause: when minting the fine-grained PAT on github.com, the "Resource owner" dropdown wasn't set to the user's own account, leaving the token without any permitted resources.
-- Verification command:
-  ```bash
-  curl -s -o /dev/null -w "HTTP %{http_code}\n" \
-    -H "Authorization: Bearer $GITHUB_PAT_TOKEN" \
-    https://api.github.com/user
-  ```
-  Must return `HTTP 200` before any further smoke testing is meaningful.
+- `uv run gh-stars sync --sync-github-lists` opt-in creates missing GitHub User Lists and assigns newly processed repos via GraphQL while preserving existing list memberships.
+- `uv run gh-stars sync-github-lists` backfills GitHub User Lists from active notes without calling Claude or rewriting notes.
 
 ### Known issues (backlog — NOT blocking)
-1. **CLI shape deviates from spec.** The implementer built subcommands (`gh-stars sync`, `gh-stars remove-unstarred`, `gh-stars reconcile-clones`); the design spec called for flat top-level flags (`--dry-run`, `--remove-unstarred`, `--reconcile-clones`). The README's CLI reference table and the `gh-stars` Claude Code skill still describe the flag syntax. Fix path: either update docs to subcommand syntax (smaller change) or refactor `main.py` to flat flags (preserves spec, larger change).
-2. **Test coverage at 69.79%, below spec's 80% target.** `main.py` orchestration paths sit at 24% coverage; the leaf modules (markdown_writer 95%, categorizer 86%, removal/cloner/config all ~75%) are well-covered. `pytest --cov` exits non-zero solely due to the `fail_under = 80` gate in `pyproject.toml`. Closing the gap requires ~6–10 additional tests over the `_sync_command` / `_remove_unstarred_command` / `_reconcile_clones_command` async flows.
-3. **`pass` subprocess hangs 10s for ANTHROPIC_API_KEY auto-resolve.** The `_resolve_anthropic_key_from_pass` helper in `src/config.py` spawns `pass ai/anthropic/api-key` via `subprocess.run`, which blocks waiting for GPG-agent unlock that doesn't propagate to non-interactive contexts. Workaround documented for users: `export ANTHROPIC_API_KEY=...` directly in `.envrc.local` rather than relying on the pass fallback. Real fix: drop the pass fallback OR shorten the subprocess timeout to ~1s.
-4. **CLI subcommand `--help` output doesn't match docs.** Once #1 is decided, README + SKILL.md should be regenerated against the actual `argparse` surface.
+1. **Test coverage at 69.79%, below spec's 80% target.** `main.py` orchestration paths sit at 24% coverage; the leaf modules (markdown_writer 95%, categorizer 86%, removal/cloner/config all ~75%) are well-covered. `pytest --cov` exits non-zero solely due to the `fail_under = 80` gate in `pyproject.toml`. Closing the gap requires ~6–10 additional tests over the `_sync_command` / `_remove_unstarred_command` / `_reconcile_clones_command` async flows.
+2. **`pass` subprocess hangs 10s for ANTHROPIC_API_KEY auto-resolve.** The `_resolve_anthropic_key_from_pass` helper in `src/config.py` spawns `pass ai/anthropic/api-key` via `subprocess.run`, which blocks waiting for GPG-agent unlock that doesn't propagate to non-interactive contexts. Workaround documented for users: `export ANTHROPIC_API_KEY=...` directly in `.envrc.local` rather than relying on the pass fallback. Real fix: drop the pass fallback OR shorten the subprocess timeout to ~1s.
 
 ### Where to pick up next
-1. **User unblocks the PAT** — verify with the curl command above. Once `HTTP 200` returns, re-run `uv run gh-stars sync --max-repos 5 --dry-run` and confirm pagination + dedup log lines look sane.
-2. **First real categorization run** (after PAT works) — `uv run gh-stars sync --max-repos 10`. Watch for: `pass` subprocess hang on Anthropic key resolution (issue #3); category/list output quality on first batch; correct frontmatter emission; `.gh-stars-history.jsonl` written to `09_feeds/gh-stars/`.
-3. **Decide #1 (CLI shape).** If keeping subcommands: rewrite README CLI table + SKILL.md usage examples in one PR. If reverting to spec: refactor `main.py` argparse — a single afternoon's work.
-4. **Close coverage gap (#2)** by adding `_sync_command` integration tests against a respx-mocked GitHub + a MagicMock-patched Anthropic.
+1. **First real categorization run** — `uv run gh-stars sync --max-repos 10`. Watch for: `pass` subprocess hang on Anthropic key resolution (issue #2); category/list output quality on first batch; correct frontmatter emission; `.gh-stars-history.jsonl` written to `09_feeds/gh-stars/`.
+2. **Close coverage gap (#1)** by adding `_sync_command` integration tests against a respx-mocked GitHub + a MagicMock-patched Anthropic.
 
 ### Commit log
 ```
@@ -82,6 +71,7 @@ When available in this environment:
 - Treat `.env.example` as the only publishable env file.
 - **Secret Management:** Use `direnv` with `.envrc.local` for local development. This allows fetching secrets from secure storage like `pass` without hardcoding them in the repository.
   - Example `.envrc.local`: `export GITHUB_PAT_TOKEN=$(pass dev/github/pat-agent)`
+- GitHub Lists sync requires User Lists GraphQL access. Resolution order is `GITHUB_LISTS_TOKEN`, then `gh auth token --hostname github.com`, then `GITHUB_PAT_TOKEN`. For `gh` OAuth tokens, refresh with `gh auth refresh -h github.com -s user`; for environment tokens, verify they can call `createUserList` and `updateUserListsForItem`.
 - Before finishing, review `git diff --staged` or `git status` for accidental local-only changes.
 - Keep default paths portable; avoid author-specific home-directory assumptions in public docs or code unless clearly justified.
 
@@ -105,8 +95,9 @@ repo: "owner/name"
 repo_id: 123456789
 description: "..."
 category: "Category Name"
-subCategory: "SubCategoryName"
+subCategory: "Purpose Discipline"
 list: "lowercase-kebab-case"
+tags: ["layer/library", "lang/python"]
 language: "Python"
 stars: 1234
 starred_at: 2026-05-18
@@ -120,10 +111,15 @@ unstar: false
 
 - All strings **double-quoted**.
 - `repo_id` is the numeric GitHub repo ID (dedup key across active + archive).
-- `subCategory` is camelCase (not snake_case or kebab-case).
+- `subCategory` uses the Title Case purpose taxonomy, for example `Agentic Orchestration` or `Workspaces & IDEs`.
 - `list` is lowercase-kebab-case from a base set in `config.py:DEFAULT_LIST_BUCKETS`, with Claude allowed to extend.
+- `tags` is required and must use only form facets: `layer/*` and optional `lang/*`.
+- `category`/`subCategory` describe Purpose; `tags` describe Form. Do not use numeric category prefixes such as `01`.
+- Do not use entity relationship tag prefixes such as `model/`, `provider/`, `tool/`, `framework/`, or `concept/`.
+- GitHub-side List assignment is deterministic in `src/github_lists.py`, not copied blindly from frontmatter `list`.
+- Existing active notes can be parsed with `read_existing_categorized_notes()` for GitHub Lists backfill; archive notes are intentionally ignored.
 - `cloned: true` triggers shallow clone on next sync; `false` does nothing.
-- `unstar: true` triggers unstar + archive on `--remove-unstarred`; `false` does nothing.
+- `unstar: true` triggers unstar + archive on `remove-unstarred`; `false` does nothing.
 
 ### Body Structure
 
@@ -146,7 +142,7 @@ unstar: false
 
 ## GitHub Unstar Safety
 
-The `--remove-unstarred` command scans notes for `unstar: true`, prompts for confirmation (listing repos as `owner/repo`), and for each:
+The `remove-unstarred` command scans notes for `unstar: true`, prompts for confirmation (listing repos as `owner/repo`), and for each:
 
 1. Calls `DELETE /user/starred/{owner}/{repo}` via GitHub API.
 2. On success, atomically moves `.md` to `archive/{filename}`.

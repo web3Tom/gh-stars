@@ -4,13 +4,26 @@ import logging
 import os
 import re
 import tempfile
+from datetime import date
 from pathlib import Path
+
+import yaml
 
 from src.models import CategorizedRepo, StarredRepo
 
 logger = logging.getLogger(__name__)
 
 _REPO_ID_PATTERN = re.compile(r'^repo_id:\s*(\d+)', re.MULTILINE)
+
+
+def _extract_frontmatter(content: str) -> str:
+    """Return YAML frontmatter only, ignoring README examples and body content."""
+    if not content.startswith("---\n"):
+        return ""
+    end = content.find("\n---", 4)
+    if end == -1:
+        return ""
+    return content[4:end]
 
 
 def read_existing_ids(output_dir: Path) -> set[int]:
@@ -25,8 +38,8 @@ def read_existing_ids(output_dir: Path) -> set[int]:
 
     # Scan active notes
     for md_file in output_dir.glob("*.md"):
-        content = md_file.read_text()
-        match = _REPO_ID_PATTERN.search(content)
+        frontmatter = _extract_frontmatter(md_file.read_text())
+        match = _REPO_ID_PATTERN.search(frontmatter)
         if match:
             all_ids.add(int(match.group(1)))
 
@@ -34,12 +47,93 @@ def read_existing_ids(output_dir: Path) -> set[int]:
     archive = output_dir / "archive"
     if archive.exists():
         for md_file in archive.glob("*.md"):
-            content = md_file.read_text()
-            match = _REPO_ID_PATTERN.search(content)
+            frontmatter = _extract_frontmatter(md_file.read_text())
+            match = _REPO_ID_PATTERN.search(frontmatter)
             if match:
                 all_ids.add(int(match.group(1)))
 
     return all_ids
+
+def read_existing_categorized_notes(
+    output_dir: Path,
+    starred_repos_by_id: dict[int, StarredRepo] | None = None,
+) -> list[CategorizedRepo]:
+    """Read active gh-stars notes as categorized repos for GitHub Lists backfill."""
+    starred_repos_by_id = starred_repos_by_id or {}
+    categorized_repos: list[CategorizedRepo] = []
+
+    if not output_dir.exists():
+        return categorized_repos
+
+    for md_file in sorted(output_dir.glob("*.md")):
+        content = md_file.read_text()
+        frontmatter = _extract_frontmatter(content)
+        if not frontmatter:
+            continue
+
+        parsed = yaml.safe_load(frontmatter) or {}
+        if not isinstance(parsed, dict) or "repo_id" not in parsed or "repo" not in parsed:
+            continue
+
+        try:
+            repo_id = int(parsed["repo_id"])
+            owner, name = str(parsed["repo"]).split("/", 1)
+        except (TypeError, ValueError):
+            logger.warning(f"Skipping malformed gh-stars note frontmatter: {md_file}")
+            continue
+
+        starred_repo = starred_repos_by_id.get(repo_id)
+        repo = starred_repo or _repo_from_frontmatter(parsed, repo_id, owner, name)
+        categorized_repos.append(
+            CategorizedRepo(
+                repo=repo,
+                category=str(parsed.get("category") or "Unsorted"),
+                sub_category=str(parsed.get("subCategory") or "Unsorted"),
+                list=str(parsed.get("list") or "unsorted"),
+                tags=_parse_tags(parsed.get("tags")),
+            )
+        )
+
+    return categorized_repos
+
+def _repo_from_frontmatter(
+    parsed: dict[str, object],
+    repo_id: int,
+    owner: str,
+    name: str,
+) -> StarredRepo:
+    starred_at = parsed.get("starred_at")
+    if isinstance(starred_at, date):
+        starred_date = starred_at
+    else:
+        try:
+            starred_date = date.fromisoformat(str(starred_at))
+        except ValueError:
+            starred_date = date.today()
+
+    try:
+        stars = int(parsed.get("stars") or 0)
+    except (TypeError, ValueError):
+        stars = 0
+
+    return StarredRepo(
+        repo_id=repo_id,
+        owner=owner,
+        name=name,
+        description=str(parsed.get("description") or ""),
+        language=str(parsed.get("language") or "") or None,
+        stars=stars,
+        homepage=None,
+        topics=(),
+        license=None,
+        repo_url=str(parsed.get("repo_url") or f"https://github.com/{owner}/{name}"),
+        starred_at=starred_date,
+    )
+
+def _parse_tags(raw_tags: object) -> tuple[str, ...]:
+    if not isinstance(raw_tags, list):
+        return ()
+    return tuple(str(tag) for tag in raw_tags if isinstance(tag, str) and tag)
 
 
 def _escape_yaml_string(value: str) -> str:
@@ -55,6 +149,7 @@ def _build_frontmatter(repo: StarredRepo, categorized: CategorizedRepo) -> str:
     category = _escape_yaml_string(categorized.category)
     sub_category = _escape_yaml_string(categorized.sub_category)
     list_val = _escape_yaml_string(categorized.list)
+    tags = ", ".join(f'"{_escape_yaml_string(tag)}"' for tag in categorized.tags)
 
     date_str = repo.starred_at.isoformat()
 
@@ -67,6 +162,7 @@ def _build_frontmatter(repo: StarredRepo, categorized: CategorizedRepo) -> str:
         f'category: "{category}"',
         f'subCategory: "{sub_category}"',
         f'list: "{list_val}"',
+        f"tags: [{tags}]",
         f'language: "{language}"',
         f"stars: {repo.stars}",
         f'starred_at: {date_str}',

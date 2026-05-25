@@ -48,11 +48,13 @@ def test_categorized_repo_creation(repo=None):
         category="AI",
         sub_category="LLM",
         list="agent-research",
+        tags=("layer/library", "lang/python"),
     )
 
     assert categorized.category == "AI"
     assert categorized.sub_category == "LLM"
     assert categorized.list == "agent-research"
+    assert categorized.tags == ("layer/library", "lang/python")
 
 
 def test_clone_stats():

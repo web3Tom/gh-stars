@@ -12,6 +12,7 @@ _REQUIRED = ("GITHUB_PAT_TOKEN",)
 _OPTIONAL = ("ANTHROPIC_API_KEY",)
 _OUTPUT_DIR_ENV = "KNOWLEDGE_BASE_DIR"
 _CLONES_DIR_ENV = "CLONES_DIR"
+_GITHUB_LISTS_TOKEN_ENV = "GITHUB_LISTS_TOKEN"
 _LOCAL_ENVRC_FILENAME = ".envrc.local"
 _PASS_KEY_PATH = "ai/anthropic/api-key"
 
@@ -73,8 +74,15 @@ def _resolve_knowledge_base_dir(env_dir: Path) -> Path:
     output_dir = (
         os.environ.get(_OUTPUT_DIR_ENV)
         or _read_local_envrc_value(_OUTPUT_DIR_ENV, env_dir / _LOCAL_ENVRC_FILENAME)
-        or str(Path.home() / "gh-stars-data")
     )
+    if output_dir:
+        return Path(output_dir).expanduser().resolve()
+
+    workspace_vault = (env_dir.parent / "knowledge").resolve()
+    if env_dir.parent.name == "workspace" and workspace_vault.exists():
+        return workspace_vault
+
+    output_dir = str(Path.home() / "gh-stars-data")
     return Path(output_dir).expanduser().resolve()
 
 
@@ -95,6 +103,33 @@ def _resolve_clones_dir(env_dir: Path) -> Path:
 
     # Fallback
     return (Path.home() / "gh-stars-clones").resolve()
+
+def resolve_github_lists_token(default_token: str) -> str:
+    """Resolve token for GitHub User Lists GraphQL calls.
+
+    User Lists currently require the broader OAuth `user` scope for `gh` tokens.
+    Keep the normal PAT for REST operations, but allow list sync to use a token
+    from `GITHUB_LISTS_TOKEN` or the authenticated `gh` CLI session.
+    """
+    env_token = os.environ.get(_GITHUB_LISTS_TOKEN_ENV)
+    if env_token:
+        return env_token
+
+    if shutil.which("gh") is None:
+        return default_token
+
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token", "--hostname", "github.com"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return default_token
+
+    return result.stdout.strip() or default_token
 
 
 @dataclass(frozen=True)

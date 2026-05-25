@@ -33,6 +33,7 @@ def _parse_repo_from_api(repo_data: dict[str, Any], starred_at: datetime) -> Sta
         license=repo_data.get("license", {}).get("name") if repo_data.get("license") else None,
         repo_url=repo_data["html_url"],
         starred_at=starred_at.date(),
+        node_id=repo_data.get("node_id"),
     )
 
 

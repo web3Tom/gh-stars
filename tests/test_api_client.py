@@ -27,6 +27,7 @@ async def test_list_starred_repos_pagination():
                         "starred_at": "2026-03-15T10:30:00Z",
                         "repo": {
                             "id": 123,
+                            "node_id": "R_kgDOExample",
                             "name": "repo1",
                             "owner": {"login": "owner1"},
                             "html_url": "https://github.com/owner1/repo1",
@@ -49,6 +50,7 @@ async def test_list_starred_repos_pagination():
 
     assert len(repos) == 1
     assert repos[0].repo_id == 123
+    assert repos[0].node_id == "R_kgDOExample"
     assert repos[0].owner == "owner1"
     assert repos[0].name == "repo1"
 
