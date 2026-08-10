@@ -12,7 +12,7 @@ from src.models import StarredRepo
 
 def test_read_existing_taxonomy_empty(tmp_vault):
     """Test read_existing_taxonomy with no files."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     categories, tags = read_existing_taxonomy(notes_dir)
 
     assert categories == {}
@@ -21,7 +21,7 @@ def test_read_existing_taxonomy_empty(tmp_vault):
 
 def test_read_existing_taxonomy_with_notes(tmp_vault):
     """Test read_existing_taxonomy scans frontmatter."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     note = notes_dir / "test.md"
     note.write_text(
@@ -43,7 +43,7 @@ tags: ["layer/library", "lang/python"]
 
 def test_read_existing_taxonomy_ignores_readme_examples(tmp_vault):
     """Test README examples do not pollute taxonomy."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     readme = notes_dir / "README.md"
     readme.write_text(
@@ -67,7 +67,7 @@ tags: ["layer/library"]
 
 def test_read_existing_taxonomy_tags_from_archive(tmp_vault):
     """Test that archive tags are scanned."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     archive_dir = notes_dir / "archive"
     archive_dir.mkdir(parents=True)
 
@@ -117,7 +117,7 @@ def test_normalize_tags_requires_layer_when_requested():
 @pytest.mark.asyncio
 async def test_categorize_repos_fallback_on_parse_error(tmp_vault):
     """Test fallback when Claude response is unparseable."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     repos = [
         StarredRepo(
@@ -154,7 +154,7 @@ async def test_categorize_repos_fallback_on_parse_error(tmp_vault):
 @pytest.mark.asyncio
 async def test_categorize_repos_success(tmp_vault):
     """Test successful categorization."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     repos = [
         StarredRepo(
@@ -200,7 +200,7 @@ async def test_categorize_repos_success(tmp_vault):
 @pytest.mark.asyncio
 async def test_categorize_repos_trusts_github_language_tag(tmp_vault):
     """Test model-inferred lang tags cannot contradict GitHub primary language."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     repos = [
         StarredRepo(
@@ -233,7 +233,7 @@ async def test_categorize_repos_trusts_github_language_tag(tmp_vault):
 @pytest.mark.asyncio
 async def test_categorize_repos_accepts_fenced_json(tmp_vault):
     """Test Claude JSON fenced in Markdown parses successfully."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     repos = [
         StarredRepo(

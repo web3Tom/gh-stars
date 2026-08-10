@@ -53,7 +53,7 @@ async def test_sync_command_writes_notes(monkeypatch, tmp_vault, tmp_clones):
         sub_category="Agentic Orchestration",
         tags=("layer/library", "lang/python"),
     )
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     calls = {"write": 0}
 
     class FakeGitHubClient:

@@ -12,7 +12,7 @@ from uuid import uuid4
 from src.api_client import GitHubClient
 from src.categorizer import categorize_repos
 from src.cloner import reconcile_clones
-from src.config import load_config
+from src.config import FEED_SUBPATH, load_config
 from src.markdown_writer import read_existing_ids, write_repo_note
 from src.removal import remove_candidates, scan_unstar_notes
 
@@ -54,7 +54,7 @@ async def _sync_command(
     logger.info("Starting sync...")
 
     config = load_config(config_path)
-    notes_dir = config.knowledge_base_dir / "09_feeds" / "gh-stars"
+    notes_dir = config.knowledge_base_dir / FEED_SUBPATH
     clones_dir = config.clones_dir
 
     # Read existing repo IDs (dedup key)
@@ -176,7 +176,7 @@ async def _remove_unstarred_command(
     logger.info("Starting unstar removal...")
 
     config = load_config(config_path)
-    notes_dir = config.knowledge_base_dir / "09_feeds" / "gh-stars"
+    notes_dir = config.knowledge_base_dir / FEED_SUBPATH
 
     client = GitHubClient(config.github_pat)
 
@@ -278,7 +278,7 @@ def main() -> None:
         asyncio.run(_remove_unstarred_command(args.config, args.verbose))
     elif args.command == "reconcile-clones":
         config = load_config(args.config)
-        notes_dir = config.knowledge_base_dir / "09_feeds" / "gh-stars"
+        notes_dir = config.knowledge_base_dir / FEED_SUBPATH
         stats = asyncio.run(reconcile_clones(notes_dir, config.clones_dir))
         logger.info(
             f"Clone reconciliation: {stats.cloned} cloned, {stats.skipped_existing} skipped"

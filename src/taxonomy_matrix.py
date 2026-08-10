@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from src.config import FEED_SUBPATH
+
 
 @dataclass(frozen=True)
 class MatrixRow:
@@ -31,18 +33,18 @@ def resolve_feed_dir(path: Path | None = None) -> Path:
     """Resolve a gh-stars feed directory without requiring secrets."""
     if path is not None:
         candidate = path.expanduser().resolve()
-        nested = candidate / "09_feeds" / "gh-stars"
+        nested = candidate / FEED_SUBPATH
         return nested if nested.exists() else candidate
 
     env_vault = os.environ.get("KNOWLEDGE_BASE_DIR")
     if env_vault:
-        return (Path(env_vault).expanduser().resolve() / "09_feeds" / "gh-stars")
+        return (Path(env_vault).expanduser().resolve() / FEED_SUBPATH)
 
     cwd = Path.cwd().resolve()
     candidates = (
-        cwd.parent / "knowledge" / "09_feeds" / "gh-stars",
-        cwd / "knowledge" / "09_feeds" / "gh-stars",
-        Path.home() / "gh-stars-data" / "09_feeds" / "gh-stars",
+        cwd.parent / "knowledge" / FEED_SUBPATH,
+        cwd / "knowledge" / FEED_SUBPATH,
+        Path.home() / "gh-stars-data" / FEED_SUBPATH,
     )
     for candidate in candidates:
         if candidate.exists():

@@ -21,7 +21,7 @@ async def test_reconcile_clones_no_notes(tmp_vault, tmp_clones):
 @pytest.mark.asyncio
 async def test_reconcile_clones_skips_archived(tmp_vault, tmp_clones):
     """Test that clones don't try to reconcile archived notes."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     archive = notes_dir / "archive"
     archive.mkdir(parents=True, exist_ok=True)
 
@@ -45,7 +45,7 @@ cloned: true
 @pytest.mark.asyncio
 async def test_reconcile_clones_existing_checkout(tmp_vault, tmp_clones):
     """Test that existing clones are skipped."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     note = notes_dir / "test-repo.md"
     note.write_text(
@@ -73,7 +73,7 @@ cloned: true
 @pytest.mark.asyncio
 async def test_reconcile_clones_false_cloned_field(tmp_vault, tmp_clones):
     """Test that cloned: false notes are ignored."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     note = notes_dir / "no-clone-repo.md"
     note.write_text(
@@ -93,7 +93,7 @@ cloned: false
 @pytest.mark.asyncio
 async def test_reconcile_clones_git_error(tmp_vault, tmp_clones):
     """Test handling of git clone errors."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     note = notes_dir / "bad-repo.md"
     note.write_text(

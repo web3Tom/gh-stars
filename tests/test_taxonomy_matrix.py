@@ -10,7 +10,7 @@ from src.taxonomy_matrix import (
 
 
 def test_scan_taxonomy_matrix_counts_category_subcategory_and_tags(tmp_vault):
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     (notes_dir / "one.md").write_text(
         """---
 repo: "owner/one"
@@ -61,7 +61,7 @@ category: "Ignored"
 
 
 def test_scan_taxonomy_matrix_skips_malformed_notes(tmp_vault):
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     (notes_dir / "bad.md").write_text("# No frontmatter\n")
 
     matrix = scan_taxonomy_matrix(notes_dir)
@@ -71,7 +71,7 @@ def test_scan_taxonomy_matrix_skips_malformed_notes(tmp_vault):
 
 
 def test_render_markdown_includes_matrix_and_tags(tmp_vault):
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     (notes_dir / "one.md").write_text(
         """---
 repo: "owner/one"
@@ -92,7 +92,7 @@ tags: ["layer/cli", "lang/rust"]
 
 
 def test_render_json_is_stable(tmp_vault):
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     (notes_dir / "one.md").write_text(
         """---
 repo: "owner/one"
@@ -113,7 +113,7 @@ tags: ["layer/markdown"]
 
 
 def test_render_terminal_table_is_compact_and_sorted_by_count(tmp_vault):
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     (notes_dir / "one.md").write_text(
         """---
 repo: "owner/one"
@@ -157,4 +157,4 @@ tags: ["layer/markdown"]
 
 
 def test_resolve_feed_dir_accepts_vault_root(tmp_vault):
-    assert resolve_feed_dir(tmp_vault) == (tmp_vault / "09_feeds" / "gh-stars").resolve()
+    assert resolve_feed_dir(tmp_vault) == (tmp_vault / "02_intake" / "gh-stars").resolve()

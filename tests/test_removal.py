@@ -10,7 +10,7 @@ from src.removal import scan_unstar_notes, remove_candidates, ScanResult
 
 def test_scan_unstar_notes_empty(tmp_vault):
     """Test scan_unstar_notes with no notes."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     result = scan_unstar_notes(notes_dir)
 
     assert result.eligible == ()
@@ -19,7 +19,7 @@ def test_scan_unstar_notes_empty(tmp_vault):
 
 def test_scan_unstar_notes_unstar_true(tmp_vault):
     """Test scanning notes with unstar: true."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     note = notes_dir / "unstar-me.md"
     note.write_text(
@@ -40,7 +40,7 @@ unstar: true
 
 def test_scan_unstar_notes_unstar_false(tmp_vault):
     """Test that unstar: false notes are skipped."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     note = notes_dir / "keep-me.md"
     note.write_text(
@@ -60,7 +60,7 @@ unstar: false
 
 def test_scan_unstar_notes_ignores_archive(tmp_vault):
     """Test that archive notes are ignored."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     archive = notes_dir / "archive"
     archive.mkdir(parents=True)
 
@@ -82,7 +82,7 @@ unstar: true
 @pytest.mark.asyncio
 async def test_remove_candidates_user_declines(tmp_vault):
     """Test remove_candidates when user declines."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     note = notes_dir / "test.md"
     note.write_text(
@@ -117,7 +117,7 @@ unstar: true
 @pytest.mark.asyncio
 async def test_remove_candidates_unstar_success(tmp_vault):
     """Test successful unstar and archival."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     archive_dir = notes_dir / "archive"
     archive_dir.mkdir(parents=True, exist_ok=True)
 

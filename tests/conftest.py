@@ -9,7 +9,7 @@ def tmp_vault(tmp_path):
     """Create a temporary vault-like directory structure."""
     vault = tmp_path / "vault"
     vault.mkdir()
-    feeds = vault / "09_feeds" / "gh-stars"
+    feeds = vault / "02_intake" / "gh-stars"
     feeds.mkdir(parents=True)
     return vault
 

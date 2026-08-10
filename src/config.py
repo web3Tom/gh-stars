@@ -8,6 +8,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# Vault-relative location of the generated notes, below KNOWLEDGE_BASE_DIR.
+FEED_SUBPATH = Path("02_intake") / "gh-stars"
+
 _REQUIRED = ("GITHUB_PAT_TOKEN",)
 _OPTIONAL = ("ANTHROPIC_API_KEY",)
 _OUTPUT_DIR_ENV = "KNOWLEDGE_BASE_DIR"

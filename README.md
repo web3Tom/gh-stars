@@ -46,7 +46,7 @@ This will:
 - Deduplicate against existing notes (including archive)
 - For repos >100: prompt for confirmation + cost estimate
 - Categorize in batches of 25 using Claude
-- Write notes to `knowledge/09_feeds/gh-stars/`
+- Write notes to `knowledge/02_intake/gh-stars/`
 - Reconcile shallow clones for repos marked `cloned: true`
 - Append history record
 
@@ -89,7 +89,7 @@ Inspect the live category/subCategory/tag matrix without calling GitHub or Claud
 uv run python scripts/gh_stars_taxonomy_matrix.py
 ```
 
-The default output is a fixed-width terminal table that works cleanly in the VS Code terminal. The script defaults to `../knowledge/09_feeds/gh-stars` when run from the workspace checkout. You can pass a feed directory or vault root explicitly:
+The default output is a fixed-width terminal table that works cleanly in the VS Code terminal. The script defaults to `../knowledge/02_intake/gh-stars` when run from the workspace checkout. You can pass a feed directory or vault root explicitly:
 
 ```bash
 uv run python scripts/gh_stars_taxonomy_matrix.py /path/to/vault

@@ -14,14 +14,14 @@ from src.models import StarredRepo, CategorizedRepo
 
 def test_read_existing_ids_empty(tmp_vault):
     """Test read_existing_ids with no files."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     ids = read_existing_ids(notes_dir)
     assert ids == set()
 
 
 def test_read_existing_ids_from_active_notes(tmp_vault):
     """Test read_existing_ids from active notes."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     # Create a sample note
     note = notes_dir / "test-repo.md"
@@ -41,7 +41,7 @@ repo_id: 123
 
 def test_read_existing_ids_ignores_readme_examples(tmp_vault):
     """Test README examples do not count as existing repo notes."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     readme = notes_dir / "README.md"
     readme.write_text(
@@ -62,7 +62,7 @@ repo_id: 884521234
 
 def test_read_existing_ids_from_archive(tmp_vault):
     """Test read_existing_ids includes archive."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
     archive_dir = notes_dir / "archive"
     archive_dir.mkdir(parents=True)
 
@@ -85,7 +85,7 @@ repo_id: 456
 @pytest.mark.asyncio
 async def test_write_repo_note(tmp_vault):
     """Test writing a repo note atomically."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     repo = StarredRepo(
         repo_id=789,
@@ -128,7 +128,7 @@ async def test_write_repo_note(tmp_vault):
 @pytest.mark.asyncio
 async def test_write_repo_note_no_readme(tmp_vault):
     """Test writing a repo note without README."""
-    notes_dir = tmp_vault / "09_feeds" / "gh-stars"
+    notes_dir = tmp_vault / "02_intake" / "gh-stars"
 
     repo = StarredRepo(
         repo_id=999,
