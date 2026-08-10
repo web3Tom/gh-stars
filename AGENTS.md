@@ -15,33 +15,31 @@ Primary goals:
 - preserve the Markdown/frontmatter contract used by generated notes
 - avoid committing secrets, local caches, or machine-specific artifacts
 
-## Current State (last updated 2026-05-18)
+## Current State (last updated 2026-08-10)
 
-**Scaffold + bug-fix commits shipped. Pipeline is functionally complete and tested at the unit level. GitHub authentication is now verified locally; current local runs default to the workspace vault when `../knowledge` exists.**
+**Pipeline is in routine production use. Full end-to-end sync runs clean against live GitHub + Anthropic APIs, and the workspace vault holds 449 categorized repo notes.**
 
 ### What works
 - Repository live on GitHub at `https://github.com/web3Tom/gh-stars`, branch `main` tracking `origin/main`.
 - `uv sync` resolves cleanly; `uv.lock` committed.
 - `pre-commit` hook installed and passing on the current tree; auto-migrated from deprecated `stages: [commit]` to `stages: [pre-commit]`.
-- All **34/34 unit tests pass** (`uv run pytest`).
-- CLI entrypoint runs end-to-end: `uv run gh-stars sync --dry-run` correctly loads config, authenticates to GitHub, paginates `/user/starred`, and surfaces auth errors as `UnstarScopeError` with a clear message.
-- Local default output resolves to `../knowledge/09_feeds/gh-stars` when the project is checked out beside the workspace Obsidian vault and `KNOWLEDGE_BASE_DIR` is unset.
+- All **50/50 unit tests pass** (`uv run pytest`) at **80.52% coverage** — above the `fail_under = 80` gate.
+- **Full sync verified end to end** (2026-08-10): 439 starred repos fetched over 6 pages, 361 deduped by `repo_id`, 88 new notes categorized in 4 batches and written; clone reconciliation ran with 0 failures.
+- Local default output resolves to `../knowledge/02_intake/gh-stars` when the project is checked out beside the workspace Obsidian vault and `KNOWLEDGE_BASE_DIR` is unset.
+- The vault-relative notes path is defined **once** as `FEED_SUBPATH` in `src/config.py` and consumed by `main.py` and `taxonomy_matrix.py`. Do not re-inline the literal — the vault has already been reorganized once (`09_feeds` → `02_intake`), and the constant is what keeps that a one-line change.
 - Frontmatter contract enforced and verified: `markdown_writer.py` scans BOTH `output_dir/*.md` and `archive/*.md` for `repo_id` dedup (see comment at `src/markdown_writer.py:33` — this is a non-negotiable invariant for the re-starring-an-archived-repo edge case).
+- Consumed by the Obsidian base at `knowledge/_bases/gh-starred-repos.base`, whose views filter on `file.folder == "02_intake/gh-stars"` and `file.hasProperty("repo_id")`. Any change to the output folder or the frontmatter schema must be mirrored there.
 
 ### Known issues (backlog — NOT blocking)
-1. **Test coverage at 69.79%, below spec's 80% target.** `main.py` orchestration paths sit at 24% coverage; the leaf modules (markdown_writer 95%, categorizer 86%, removal/cloner/config all ~75%) are well-covered. `pytest --cov` exits non-zero solely due to the `fail_under = 80` gate in `pyproject.toml`. Closing the gap requires ~6–10 additional tests over the `_sync_command` / `_remove_unstarred_command` / `_reconcile_clones_command` async flows.
-2. **`pass` subprocess hangs 10s for ANTHROPIC_API_KEY auto-resolve.** The `_resolve_anthropic_key_from_pass` helper in `src/config.py` spawns `pass ai/anthropic/api-key` via `subprocess.run`, which blocks waiting for GPG-agent unlock that doesn't propagate to non-interactive contexts. Workaround documented for users: `export ANTHROPIC_API_KEY=...` directly in `.envrc.local` rather than relying on the pass fallback. Real fix: drop the pass fallback OR shorten the subprocess timeout to ~1s.
+1. **`pass` subprocess hangs 10s for ANTHROPIC_API_KEY auto-resolve.** The `_resolve_anthropic_key_from_pass` helper in `src/config.py` spawns `pass ai/anthropic/api-key` via `subprocess.run`, which blocks waiting for GPG-agent unlock that doesn't propagate to non-interactive contexts. Workaround documented for users: `export ANTHROPIC_API_KEY=...` directly in `.envrc.local` rather than relying on the pass fallback. Real fix: drop the pass fallback OR shorten the subprocess timeout to ~1s.
+2. **`main.py` orchestration is the thinnest-covered module at 66%.** The uncovered spans are `_remove_unstarred_command` (175–220) and the argparse dispatch (277–288). Leaf modules are well covered. Worth closing before any further change to the removal flow.
 
 ### Where to pick up next
-1. **First real categorization run** — `uv run gh-stars sync --max-repos 10`. Watch for: `pass` subprocess hang on Anthropic key resolution (issue #2); category/tag output quality on first batch; correct frontmatter emission; `.gh-stars-history.jsonl` written to `09_feeds/gh-stars/`.
-2. **Close coverage gap (#1)** by adding `_sync_command` integration tests against a respx-mocked GitHub + a MagicMock-patched Anthropic.
+1. **Exercise `remove-unstarred` against real data.** It is the only command never run end to end; notes are flagged with `unstar: true` by hand in Obsidian. Verify the archive move happens only after the GitHub `DELETE` succeeds.
+2. **Close the `main.py` coverage gap (#2)** with `_remove_unstarred_command` tests against a respx-mocked GitHub.
 
 ### Commit log
-```
-289ba94  fix(tests): unblock pytest run by fixing two test-setup bugs
-8aee5f5  fix: dry-run skips Anthropic key check; add missing pytest import
-fb0c97e  feat: initial gh-stars scaffold
-```
+Run `git log --oneline` — this section is no longer mirrored by hand.
 
 ### Design spec (not in this repo)
 The full design rationale, 27 numbered decisions, and grill-session history live in the user's Obsidian vault at `knowledge/07_specs/051826_github_stars_feed.md`. Source of truth for "why we built it this way." Not pushed to GitHub.
